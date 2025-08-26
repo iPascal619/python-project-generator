@@ -1,4 +1,4 @@
-name: Daily Tiny Project Commit
+name: Daily AI Python Project
 
 on:
   schedule:
@@ -6,8 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  commit-tiny-project:
+  generate-and-commit:
     runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,15 +19,16 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Generate tiny project
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate AI Python project
         run: python generate_project.py
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore: add tiny project for $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git add projects/
+          git commit -m "chore: add AI-generated Python project for $(date +'%Y-%m-%d')" || echo "No changes to commit"
           git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
