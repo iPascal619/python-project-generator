@@ -81,7 +81,7 @@ class ProjectGenerator:
     
     def _make_api_request(self, payload: Dict) -> Dict:
         """Make API request with retry logic."""
-        url = "https://api.groq.com/v1/chat/completions"
+        url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
