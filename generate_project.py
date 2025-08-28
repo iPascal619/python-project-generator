@@ -50,14 +50,20 @@ class ProjectGenerator:
         """Create a detailed prompt based on project type and difficulty."""
         base_prompt = (
             f"Generate a unique, useful Python project of type '{project_type}' "
-            f"with '{difficulty}' difficulty level. "
-            "Return a JSON object with these exact fields:\n"
-            "- 'project_name': A descriptive name (use underscores for spaces)\n"
-            "- 'main_py': Complete, runnable Python code with proper error handling\n"
-            "- 'requirements_txt': All necessary dependencies with versions\n"
-            "- 'readme_md': Comprehensive README with description, installation, usage, and examples\n"
-            "- 'description': Brief project description\n\n"
-            "Requirements:\n"
+            f"with '{difficulty}' difficulty level.\n\n"
+            "IMPORTANT: Format your response as follows:\n"
+            "PROJECT_NAME: [descriptive_name_with_underscores]\n"
+            "DESCRIPTION: [brief description]\n"
+            "===MAIN_PY_START===\n"
+            "[complete Python code here]\n"
+            "===MAIN_PY_END===\n"
+            "===REQUIREMENTS_START===\n"
+            "[dependency list here]\n"
+            "===REQUIREMENTS_END===\n"
+            "===README_START===\n"
+            "[comprehensive README content here]\n"
+            "===README_END===\n\n"
+            "Code Requirements:\n"
             "- Include proper error handling and logging\n"
             "- Add docstrings and comments\n"
             "- Follow PEP 8 style guidelines\n"
@@ -100,21 +106,16 @@ class ProjectGenerator:
                 logger.warning(f"Request failed, retrying: {e}")
     
     def _parse_response(self, response: Dict) -> Dict:
-        """Parse and validate API response."""
+        """Parse and validate API response using simple text parsing."""
         try:
             content = response["choices"][0]["message"]["content"]
             
-            # Try to extract JSON from markdown code blocks if present
-            if "```json" in content:
-                start = content.find("```json") + 7
-                end = content.find("```", start)
-                content = content[start:end].strip()
-            elif "```" in content:
-                start = content.find("```") + 3
-                end = content.find("```", start)
-                content = content[start:end].strip()
+            # Save raw response for debugging
+            with open("debug_response.txt", "w", encoding="utf-8", errors="replace") as f:
+                f.write(content)
+            logger.info("Raw response saved to debug_response.txt")
             
-            project_data = json.loads(content)
+            project_data = self._parse_structured_response(content)
             
             # Validate required fields
             required_fields = ["project_name", "main_py", "requirements_txt", "readme_md"]
@@ -127,6 +128,60 @@ class ProjectGenerator:
             
         except (KeyError, IndexError) as e:
             raise ValueError(f"Unexpected API response format: {e}")
+    
+    def _parse_structured_response(self, content: str) -> Dict:
+        """Parse structured text response instead of JSON."""
+        result = {}
+        
+        # Extract PROJECT_NAME
+        if "PROJECT_NAME:" in content:
+            start = content.find("PROJECT_NAME:") + 13
+            end = content.find("\n", start)
+            result["project_name"] = content[start:end].strip()
+        
+        # Extract DESCRIPTION
+        if "DESCRIPTION:" in content:
+            start = content.find("DESCRIPTION:") + 12
+            end = content.find("\n", start)
+            result["description"] = content[start:end].strip()
+        
+        # Extract MAIN_PY
+        start_marker = "===MAIN_PY_START==="
+        end_marker = "===MAIN_PY_END==="
+        if start_marker in content and end_marker in content:
+            start = content.find(start_marker) + len(start_marker)
+            end = content.find(end_marker)
+            result["main_py"] = content[start:end].strip()
+        
+        # Extract REQUIREMENTS
+        start_marker = "===REQUIREMENTS_START==="
+        end_marker = "===REQUIREMENTS_END==="
+        if start_marker in content and end_marker in content:
+            start = content.find(start_marker) + len(start_marker)
+            end = content.find(end_marker)
+            result["requirements_txt"] = content[start:end].strip()
+        
+        # Extract README
+        start_marker = "===README_START==="
+        end_marker = "===README_END==="
+        if start_marker in content and end_marker in content:
+            start = content.find(start_marker) + len(start_marker)
+            end = content.find(end_marker)
+            result["readme_md"] = content[start:end].strip()
+        
+        # Set defaults for missing fields
+        if "project_name" not in result:
+            result["project_name"] = "generated_project"
+        if "description" not in result:
+            result["description"] = "AI generated Python project"
+        if "main_py" not in result:
+            raise ValueError("No main.py code found in response")
+        if "requirements_txt" not in result:
+            result["requirements_txt"] = "# No requirements specified"
+        if "readme_md" not in result:
+            result["readme_md"] = f"# {result['project_name']}\n\n{result.get('description', '')}"
+        
+        return result
     
     def create_project_files(self, project_data: Dict, custom_name: Optional[str] = None) -> Path:
         """Create project files and directory structure."""
