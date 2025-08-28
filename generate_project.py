@@ -30,7 +30,7 @@ class ProjectGenerator:
         prompt = self._create_prompt(project_type, difficulty)
         
         payload = {
-            "model": "llama-3-70b-8192",
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
             "temperature": temperature
